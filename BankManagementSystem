@@ -1,0 +1,311 @@
+import java.io.*;
+import java.util.*;
+import java.time.LocalDateTime;
+
+/*
+ * ================================
+ * Banking Information System
+ * Core Java | Console Based
+ * Single File Prototype
+ * ================================
+ *
+ * Features:
+ * - User Registration
+ * - Login with Password
+ * - Deposit & Withdrawal
+ * - Fund Transfer
+ * - Account Statement
+ * - File Persistence (Serialization)
+ * - Error Handling
+ */
+
+/* -------------------------------------------------
+ * Transaction class
+ * Stores details of each transaction
+ * -------------------------------------------------
+ */
+class Transaction implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    String type;            // Deposit / Withdraw / Transfer
+    double amount;          // Transaction amount
+    double balanceAfter;    // Balance after transaction
+    LocalDateTime date;     // Date and time
+
+    Transaction(String type, double amount, double balanceAfter) {
+        this.type = type;
+        this.amount = amount;
+        this.balanceAfter = balanceAfter;
+        this.date = LocalDateTime.now();
+    }
+
+    @Override
+    public String toString() {
+        return date + " | " + type +
+               " | Amount: " + amount +
+               " | Balance: " + balanceAfter;
+    }
+}
+
+/* -------------------------------------------------
+ * User class
+ * Represents a bank account holder
+ * -------------------------------------------------
+ */
+class User implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    int accountNumber;
+    String name;
+    String password;
+    double balance;
+    ArrayList<Transaction> transactions;
+
+    User(int accountNumber, String name, String password, double balance) {
+        this.accountNumber = accountNumber;
+        this.name = name;
+        this.password = password;
+        this.balance = balance;
+        this.transactions = new ArrayList<>();
+    }
+
+    // Check password during login
+    boolean checkPassword(String pwd) {
+        return password.equals(pwd);
+    }
+
+    // Deposit money
+    void deposit(double amount) {
+        balance += amount;
+        transactions.add(new Transaction("Deposit", amount, balance));
+    }
+
+    // Withdraw money (with balance check)
+    boolean withdraw(double amount) {
+        if (amount > balance)
+            return false;
+
+        balance -= amount;
+        transactions.add(new Transaction("Withdraw", amount, balance));
+        return true;
+    }
+}
+
+/* -------------------------------------------------
+ * Main Banking System Class
+ * -------------------------------------------------
+ */
+public class BankingSystem {
+
+    static Scanner sc = new Scanner(System.in);
+
+    // Stores all users (AccountNumber -> User)
+    static HashMap<Integer, User> users = loadUsers();
+
+    // Used to generate unique account numbers
+    static int accountCounter = 1000;
+
+    static final String FILE_NAME = "users.dat";
+
+    public static void main(String[] args) {
+
+        while (true) {
+            System.out.println("\n===== BANKING SYSTEM =====");
+            System.out.println("1. Register");
+            System.out.println("2. Login");
+            System.out.println("3. Exit");
+            System.out.print("Choose option: ");
+
+            int choice = sc.nextInt();
+
+            switch (choice) {
+                case 1 -> register();
+                case 2 -> login();
+                case 3 -> {
+                    saveUsers();
+                    System.out.println("Thank you for using Banking System!");
+                    return;
+                }
+                default -> System.out.println("Invalid choice!");
+            }
+        }
+    }
+
+    /* -------------------------------
+     * User Registration
+     * -------------------------------
+     */
+    static void register() {
+        sc.nextLine();
+
+        System.out.print("Enter Name: ");
+        String name = sc.nextLine();
+
+        System.out.print("Set Password: ");
+        String pwd = sc.nextLine();
+
+        System.out.print("Initial Deposit: ");
+        double bal = sc.nextDouble();
+
+        int accNo = ++accountCounter;
+
+        User user = new User(accNo, name, pwd, bal);
+        users.put(accNo, user);
+
+        saveUsers();
+
+        System.out.println("Registration Successful!");
+        System.out.println("Your Account Number: " + accNo);
+    }
+
+    /* -------------------------------
+     * Login System
+     * -------------------------------
+     */
+    static void login() {
+        System.out.print("Enter Account Number: ");
+        int acc = sc.nextInt();
+
+        sc.nextLine();
+        System.out.print("Enter Password: ");
+        String pwd = sc.nextLine();
+
+        User user = users.get(acc);
+
+        if (user == null || !user.checkPassword(pwd)) {
+            System.out.println("Invalid Account Number or Password!");
+            return;
+        }
+
+        userMenu(user);
+    }
+
+    /* -------------------------------
+     * Logged-in User Menu
+     * -------------------------------
+     */
+    static void userMenu(User user) {
+        while (true) {
+            System.out.println("\nWelcome " + user.name);
+            System.out.println("1. Deposit");
+            System.out.println("2. Withdraw");
+            System.out.println("3. Transfer");
+            System.out.println("4. Account Statement");
+            System.out.println("5. Logout");
+
+            int ch = sc.nextInt();
+
+            switch (ch) {
+                case 1 -> deposit(user);
+                case 2 -> withdraw(user);
+                case 3 -> transfer(user);
+                case 4 -> statement(user);
+                case 5 -> {
+                    saveUsers();
+                    return;
+                }
+                default -> System.out.println("Invalid choice!");
+            }
+        }
+    }
+
+    /* -------------------------------
+     * Deposit Money
+     * -------------------------------
+     */
+    static void deposit(User user) {
+        System.out.print("Enter Amount: ");
+        double amt = sc.nextDouble();
+
+        user.deposit(amt);
+        System.out.println("Deposit Successful!");
+        System.out.println("Current Balance: " + user.balance);
+    }
+
+    /* -------------------------------
+     * Withdraw Money
+     * -------------------------------
+     */
+    static void withdraw(User user) {
+        System.out.print("Enter Amount: ");
+        double amt = sc.nextDouble();
+
+        if (user.withdraw(amt)) {
+            System.out.println("Withdrawal Successful!");
+            System.out.println("Current Balance: " + user.balance);
+        } else {
+            System.out.println("Insufficient Balance!");
+        }
+    }
+
+    /* -------------------------------
+     * Fund Transfer
+     * -------------------------------
+     */
+    static void transfer(User sender) {
+        System.out.print("Receiver Account Number: ");
+        int acc = sc.nextInt();
+
+        System.out.print("Amount: ");
+        double amt = sc.nextDouble();
+
+        User receiver = users.get(acc);
+
+        if (receiver == null) {
+            System.out.println("Receiver account not found!");
+            return;
+        }
+
+        if (sender.withdraw(amt)) {
+            receiver.deposit(amt);
+            System.out.println("Transfer Successful!");
+        } else {
+            System.out.println("Insufficient Balance!");
+        }
+    }
+
+    /* -------------------------------
+     * Account Statement
+     * -------------------------------
+     */
+    static void statement(User user) {
+        System.out.println("\n----- Account Statement -----");
+        for (Transaction t : user.transactions) {
+            System.out.println(t);
+        }
+        System.out.println("Current Balance: " + user.balance);
+    }
+
+    /* -------------------------------
+     * File Persistence - Load Users
+     * -------------------------------
+     */
+    static HashMap<Integer, User> loadUsers() {
+        try (ObjectInputStream in =
+                     new ObjectInputStream(new FileInputStream(FILE_NAME))) {
+
+            // BUG-FREE CASTING
+            return (HashMap<Integer, User>) in.readObject();
+
+        } catch (Exception e) {
+            return new HashMap<>(); // First run or file not found
+        }
+    }
+
+    /* -------------------------------
+     * File Persistence - Save Users
+     * -------------------------------
+     */
+    static void saveUsers() {
+        try (ObjectOutputStream out =
+                     new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+
+            out.writeObject(users);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
